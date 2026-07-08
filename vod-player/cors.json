@@ -1,0 +1,16 @@
+[
+  {
+    "origin": ["https://YOUR_FRONTEND_DOMAIN.com", "http://localhost:3000", "http://localhost:5173"],
+    "method": ["GET", "HEAD", "OPTIONS"],
+    "responseHeader": [
+      "Content-Type",
+      "Content-Length",
+      "Content-Range",
+      "Accept-Ranges",
+      "ETag",
+      "Last-Modified",
+      "Cache-Control"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

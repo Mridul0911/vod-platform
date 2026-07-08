@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VOD Player — Plain HTML Example</title>
+
+  <!--
+    Shaka Player UI CSS is loaded automatically by vod-player.js when
+    enableUi: true (the default). No manual import needed.
+  -->
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f0f13;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .player-wrapper {
+      width: 100%;
+      max-width: 900px;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.7);
+      position: relative;
+    }
+
+    /* Shaka UI requires a container wrapping the video */
+    .shaka-video-container {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: #888;
+      min-height: 22px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #555;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .status-dot.buffering { background: #f59e0b; animation: pulse 1s infinite; }
+    .status-dot.ready     { background: #22c55e; }
+    .status-dot.error     { background: #ef4444; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #1e1e2e;
+      color: #e0e0e0;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover { background: #2a2a3e; border-color: #555; }
+    button:active { background: #111; }
+
+    #reload-btn { border-color: #3b82f6; color: #93c5fd; }
+    #reload-btn:hover { background: #1e3a5f; }
+  </style>
+</head>
+<body>
+
+  <h1>VOD Player — Plain HTML Demo</h1>
+
+  <!-- ── Player container ────────────────────────────────────────────────────
+       The Shaka UI overlay REQUIRES a container div around the <video>.
+       vod-player.js reads videoElement.parentElement to attach the UI.
+  ─────────────────────────────────────────────────────────────────────────── -->
+  <div class="player-wrapper">
+    <div class="shaka-video-container" id="player-container">
+      <video id="video" preload="metadata"></video>
+    </div>
+  </div>
+
+  <!-- Status row -->
+  <div class="status-bar">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Initializing…</span>
+  </div>
+
+  <!-- Custom controls (supplement Shaka UI) -->
+  <div class="controls">
+    <button id="reload-btn">↺ Reload with new URL</button>
+  </div>
+
+  <!-- ── Import VodPlayer as an ES module ──────────────────────────────────── -->
+  <script type="module">
+    import { VodPlayer, VodPlayerError } from './vod-player.js';
+
+    // ── Source URL ───────────────────────────────────────────────────────────
+    // When using serve.py, the media file is at /media/<filename>.
+    // When deployed, replace with your GCS / CDN URL.
+    // Can also be a DASH .mpd or HLS .m3u8 — no code change needed.
+    const params = new URLSearchParams(window.location.search);
+    const VIDEO_SRC = params.get('src') || '/media/30. Designing Tinder Feed.mp4';
+
+    // ── DOM refs ─────────────────────────────────────────────────────────────
+    const videoEl   = document.getElementById('video');
+    const statusDot = document.getElementById('status-dot');
+    const statusTxt = document.getElementById('status-text');
+    const reloadBtn = document.getElementById('reload-btn');
+
+    function setStatus(state, message) {
+      statusDot.className = `status-dot ${state}`;
+      statusTxt.textContent = message;
+    }
+
+    // ── Instantiate the player ────────────────────────────────────────────────
+    const player = new VodPlayer(videoEl, {
+      enableUi: true,  // Shaka UI overlay (play/pause, seekbar, fullscreen, volume)
+
+      onLoaded(metadata) {
+        const mins = Math.floor(metadata.duration / 60);
+        const secs = Math.floor(metadata.duration % 60);
+        setStatus('ready', `Ready — ${metadata.videoWidth}×${metadata.videoHeight}, ${mins}m ${secs}s`);
+        console.log('[VodPlayer] Loaded metadata:', metadata);
+      },
+
+      onBuffering(isBuffering) {
+        if (isBuffering) {
+          setStatus('buffering', 'Buffering…');
+        } else {
+          setStatus('ready', 'Playing');
+        }
+      },
+
+      onError(err) {
+        setStatus('error', err.message);
+        console.error('[VodPlayer] Error:', err);
+
+        // Signed URL refresh example:
+        // If the URL expired (403), fetch a fresh one and reload.
+        if (err.isExpiredUrl) {
+          console.warn('[VodPlayer] Signed URL expired — refresh and reload');
+          // fetchFreshSignedUrl().then(url => player.load(url));
+        }
+      },
+    });
+
+    // ── Load the video ────────────────────────────────────────────────────────
+    setStatus('', 'Loading…');
+    player.load(VIDEO_SRC);
+
+    // ── Reload button (demonstrates load() re-use) ────────────────────────────
+    reloadBtn.addEventListener('click', async () => {
+      const newUrl = prompt('Enter new video URL:', VIDEO_SRC);
+      if (!newUrl) return;
+      setStatus('', 'Loading new source…');
+      try {
+        await player.load(newUrl);
+        await player.play();
+      } catch (err) {
+        // onError callback already called by the player
+      }
+    });
+
+    // Expose to console for dev inspection
+    window.__vodPlayer = player;
+  </script>
+
+</body>
+</html>

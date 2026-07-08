@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Media files & Local Test assets
+test-media/
+*.mp4
+*.wav
+*.h264
+*.aac
+
+# IDEs & System files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
